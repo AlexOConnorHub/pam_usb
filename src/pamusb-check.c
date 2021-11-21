@@ -16,13 +16,13 @@
  */
 
 #include <stdio.h>
-#include <unistd.h>
 #include <string.h>
 #include <getopt.h>
 #include "conf.h"
 #include "log.h"
 #include "device.h"
 #include "local.h"
+#include "version.h"
 
 static void pusb_check_conf_dump(t_pusb_options *opts, const char *username,
 		const char *service)
@@ -59,7 +59,7 @@ static int pusb_check_perform_authentication(t_pusb_options *opts,
 	}
 	log_info("Authentication request for user \"%s\" (%s)\n",
 			user, service);
-	if (!pusb_local_login(opts, user))
+	if (pusb_local_login(opts, user, service) != 1)
 	{
 		log_error("Access denied.\n");
 		return (0);
@@ -74,7 +74,7 @@ static int pusb_check_perform_authentication(t_pusb_options *opts,
 
 static void pusb_check_usage(const char *name)
 {
-	fprintf(stderr, "Usage: %s [--help] [--debug] [--config=path] [--service=name] [--dump] [--quiet] [--debug]" \
+	fprintf(stderr, "Usage: %s [--help] [--debug] [--config=path] [--service=name] [--dump] [--quiet] [--debug] [--version]" \
 			" <username>\n", name);
 }
 
@@ -98,6 +98,7 @@ int main(int argc, char **argv)
 		{ "dump", 0, 0, 0 },
 		{ "quiet", 0, 0, 0 },
 		{ "debug", 0, 0, 0 },
+		{ "version", 0, 0, 0 },
 		{ 0, 0, 0, 0 }
 	};
 
@@ -119,6 +120,10 @@ int main(int argc, char **argv)
 			quiet = 1;
 		else if (opt == 'D' || (!opt && !strcmp(long_options[opt_index].name, "debug")))
 			debug = 1;
+		else if (opt == 'v' || (!opt && !strcmp(long_options[opt_index].name, "version"))) {
+			fprintf(stderr, "Version %s\n", PUSB_VERSION);
+			return (1);
+		}
 		else if (opt == '?')
 		{
 			pusb_check_usage(argv[0]);

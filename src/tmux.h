@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003-2007 Andrea Luzzardi <scox@sig11.org>
+ * Copyright (c) 2021 Tobias Bäumer <tobiasbaeumer@gmail.com>
  *
  * This file is part of the pam_usb project. pam_usb is free software;
  * you can redistribute it and/or modify it under the terms of the GNU General
@@ -15,9 +15,11 @@
  * Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#ifndef PUSB_VERSION_H_
-# define PUSB_VERSION_H_
+#ifndef PUSB_TMUX_H_
+# define PUSB_TMUX_H_
 
-# define PUSB_VERSION "0.8.1"
+char *pusb_tmux_get_client_tty(pid_t tmux_pid);
 
-#endif /* !PUSB_VERSION_H_ */
+int pusb_tmux_has_remote_clients(const char* username);
+
+#endif /* !PUSB_TMUX_H_ */

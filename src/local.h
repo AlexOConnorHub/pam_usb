@@ -18,6 +18,14 @@
 #ifndef PUSB_LOCAL_H_
 # define PUSB_LOCAL_H_
 
-int pusb_local_login(t_pusb_options *opts, const char *user);
+int pusb_local_login(t_pusb_options *opts, const char *user, const char *service);
+
+int pusb_is_tty_local(char *tty);
+
+char *pusb_get_tty_from_display_server(const char *display);
+
+char *pusb_get_tty_by_xorg_display(const char *display, const char *user);
+
+char *pusb_get_tty_by_loginctl();
 
 #endif /* !PUSB_LOCAL_H_ */

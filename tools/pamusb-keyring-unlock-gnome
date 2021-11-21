@@ -1,0 +1,51 @@
+#!/bin/sh
+#
+# Copyright (c) 2021 Tobias Bäumer <tobiasbaeumer@gmail.com>
+#
+# This file is part of the pam_usb project. pam_usb is free software;
+# you can redistribute it and/or modify it under the terms of the GNU General
+# Public License version 2, as published by the Free Software Foundation.
+#
+# pam_usb is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc., 51 Franklin
+# Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+# Check for valid authentication
+pamusb-check `whoami` > /dev/null 2>&1 || (logger -p local0.error -t ${0##*/}[$$] pamusb-check failed. && exit 1)
+
+# Check if password file exists, first try $HOME then the auth device
+if [ ! -f ~/.keyring_unlock_password ]; then
+    logger -p local0.notice -t ${0##*/}[$$] No password file found, exiting.
+    exit 0
+fi
+
+# Ensure file has 0600 (if FS supports it)
+PERMISSIONS=`stat -c "%a %n" ~/.keyring_unlock_password | awk '{print $1}'`
+if [ ! "$PERMISSIONS" = "600" ]; then
+    logger -p local0.error -t ${0##*/}[$$] Bad permissions on ~/.keyring_unlock_password. Please change them to 0600.
+    exit 1
+fi
+
+# Kill existing keyring instance
+kill `pidof gnome-keyring-daemon`
+if [ ! "$?" = "0" ]; then
+    logger -p local0.notice -t ${0##*/}[$$] Couldn\'t kill existing gnome-keyring-instance - was it launched already?
+else
+    logger -p local0.notice -t ${0##*/}[$$] Killed existing gnome-keyring-instance.
+fi
+
+# Read UNLOCK_PASSWORD from $KEYFILE
+. ~/.keyring_unlock_password
+
+# Perform unlock
+echo -n $UNLOCK_PASSWORD | gnome-keyring-daemon --daemonize --login \
+    && gnome-keyring-daemon --start  > /dev/null 2>&1; UNLOCKED=$? \
+    && logger -p local0.notice -t ${0##*/}[$$] Keyring unlocked. \
+    || logger -p local0.error -t ${0##*/}[$$] Keyring unlock failed.
+
+exit $UNLOCKED

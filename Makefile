@@ -3,9 +3,16 @@ DEBUG		:= no
 
 PREFIX		?= /usr
 ARCH := $(shell uname -m)
+UID := $(shell id -u)
+GID := $(shell id -g)
+USE_FEDORA_LIBDIR := $(shell test -d /lib64/security && echo 1 || echo 0)
 
 ifeq ($(ARCH), x86_64)
-	LIBDIR ?= lib/x86_64-linux-gnu
+	ifeq ($(USE_FEDORA_LIBDIR), 1)
+        LIBDIR ?= lib64
+	else
+		LIBDIR ?= lib/x86_64-linux-gnu
+    endif
 endif
 ifeq ($(ARCH), i686)
 	LIBDIR ?= lib
@@ -26,6 +33,7 @@ SRCS		:= src/conf.c \
 		   src/pad.c \
 		   src/volume.c \
 		   src/process.c \
+		   src/tmux.c \
 		   src/local.c \
 		   src/device.c
 OBJS		:= $(SRCS:.c=.o)
@@ -45,6 +53,7 @@ PAMUSB_CHECK		:= pamusb-check
 # Tools
 PAMUSB_CONF		:= pamusb-conf
 PAMUSB_AGENT		:= pamusb-agent
+PAMUSB_KEYRING_GNOME		:= pamusb-keyring-unlock-gnome
 TOOLS_DEST		:= $(DESTDIR)$(PREFIX)/bin
 TOOLS_SRC		:= tools
 
@@ -57,7 +66,7 @@ DOCS		:= doc/CONFIGURATION doc/QUICKSTART
 DOCS_DEST	:= $(DESTDIR)$(PREFIX)/share/doc/pam_usb
 
 # Man
-MANS		:= doc/pamusb-conf.1.gz doc/pamusb-agent.1.gz doc/pamusb-check.1.gz
+MANS		:= doc/pamusb-conf.1.gz doc/pamusb-agent.1.gz doc/pamusb-check.1.gz doc/pamusb-keyring-unlock-gnome.1.gz
 MANS_DEST	:= $(DESTDIR)$(PREFIX)/share/man/man1
 
 # PAM config
@@ -71,6 +80,7 @@ INSTALL		:= install
 MKDIR		:= mkdir
 DEBUILD := debuild -b -uc -us --lintian-opts --profile debian
 MANCOMPILE := gzip -kf
+DOCKER := docker
 
 ifeq (yes, ${DEBUG})
 	CFLAGS := ${CFLAGS} -ggdb
@@ -96,7 +106,7 @@ manpages:
 install		: all
 		$(MKDIR) -p $(CONFS_DEST) $(DOCS_DEST) $(MANS_DEST) $(TOOLS_DEST) $(PAM_USB_DEST) $(PAM_CONF_DEST)
 		$(INSTALL) -m755 $(PAM_USB) $(PAM_USB_DEST)
-		$(INSTALL) -m755 $(PAMUSB_CHECK) $(TOOLS_SRC)/$(PAMUSB_CONF) $(TOOLS_SRC)/$(PAMUSB_AGENT) $(TOOLS_DEST)
+		$(INSTALL) -m755 $(PAMUSB_CHECK) $(TOOLS_SRC)/$(PAMUSB_CONF) $(TOOLS_SRC)/$(PAMUSB_AGENT) $(TOOLS_SRC)/$(PAMUSB_KEYRING_GNOME) $(TOOLS_DEST)
 		$(INSTALL) -b -m644 $(CONFS) $(CONFS_DEST)
 		$(INSTALL) -m644 $(DOCS) $(DOCS_DEST)
 		$(INSTALL) -m644 $(MANS) $(MANS_DEST)
@@ -104,7 +114,7 @@ install		: all
 
 deinstall	:
 		$(RM) -f $(PAM_USB_DEST)/$(PAM_USB)
-		$(RM) -f $(TOOLS_DEST)/$(PAMUSB_CHECK) $(TOOLS_DEST)/$(PAMUSB_CONF) $(TOOLS_DEST)/$(PAMUSB_AGENT) $(PAM_CONF_DEST)/$(PAM_CONF)
+		$(RM) -f $(TOOLS_DEST)/$(PAMUSB_CHECK) $(TOOLS_DEST)/$(PAMUSB_CONF) $(TOOLS_DEST)/$(PAMUSB_AGENT) $(TOOLS_DEST)/$(PAMUSB_KEYRING_GNOME) $(PAM_CONF_DEST)/$(PAM_CONF)
 		$(RM) -rf $(DOCS_DEST)
 		$(RM) -f $(MANS_DEST)/pamusb-*\.1\.gz
 		$(RM) -f $(PAM_CONF_DEST)/$(PAM_CONF)
@@ -118,5 +128,16 @@ debchangelog :
 deb : clean all
 	$(DEBUILD)
 
-deb-sign : deb
-	debsign -S -k$(APT_SIGNING_KEY) `ls -t ../*.changes | head -1`
+deb-sign : build
+	debsign -S -k$(APT_SIGNING_KEY) `ls -t .build/*.changes | head -1`
+
+buildenv :
+	$(DOCKER) build -t mcdope/pam_usb-ubuntu-build .
+
+build : buildenv
+	mkdir -p .build
+	$(DOCKER) run -it \
+		-v`pwd`/.build:/usr/local/src \
+		-v`pwd`:/usr/local/src/pam_usb \
+		--rm mcdope/pam_usb-ubuntu-build \
+		sh -c "make deb && chown $(UID):$(GID) ../libpam-usb*"
